@@ -13,4 +13,3 @@ else
     echo "cluster-deployment-automation deployment failed with error code $ret"
     exit $ret
 fi
-

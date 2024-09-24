@@ -21,5 +21,3 @@ export acc=$(echo "$nodes" | grep -oP '^\d{3}-acc')
 envsubst < ../hack/cluster-configs/ocp-tft-config.yaml > tft_config.yaml
 
 python3.11 main.py tft_config.yaml
-
- 
