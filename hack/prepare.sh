@@ -5,18 +5,15 @@ set -e
 git submodule init
 git submodule update
 
-cd cluster-deployment-automation
-rm -rf /tmp/cda-venv
-python3.11 -m venv /tmp/cda-venv
-source /tmp/cda-venv/bin/activate
-sh ./dependencies.sh
-deactivate
-cd -
+rm -rf ./.tmp/ocp-venv
+python3.11 -m venv ./.tmp/ocp-venv
 
-cd ocp-traffic-flow-tests
-rm -rf /tmp/tft-venv
-python3.11 -m venv /tmp/tft-venv
-source /tmp/tft-venv/bin/activate
-pip3.11 install -r requirements.txt
-deactivate
-cd -
+source ./.tmp/ocp-venv/bin/activate
+
+pushd cluster-deployment-automation
+sh ./dependencies.sh
+popd
+
+pushd ocp-traffic-flow-tests
+pip install -r requirements.txt
+popd
