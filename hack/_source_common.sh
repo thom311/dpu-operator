@@ -9,6 +9,10 @@ detect_dpu_kind() {
     # name, except it's encoded in a google sheet.
 
     case "$HOSTNAME" in
+        "wsfd-advnetlab44.anl.eng.bos2.dc.redhat.com" | \
+        "wsfd-advnetlab41.anl.eng.bos2.dc.redhat.com" )
+            echo "marvell-dpu"
+            ;;
         *)
             echo "dpu"
             ;;
