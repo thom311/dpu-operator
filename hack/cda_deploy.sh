@@ -23,12 +23,18 @@ case "$CLUSTER_KIND" in
                 dpu)
                     CLUSTER_CONFIG="config-dpu.yaml"
                     ;;
+                marvell-dpu)
+                    CLUSTER_CONFIG="config-marvell-dpu.yaml"
+                    ;;
             esac
             ;;
         "dpu-host")
             case "$DPU_KIND" in
                 dpu)
                     CLUSTER_CONFIG="config-dpu-host.yaml"
+                    ;;
+                marvell-dpu)
+                    CLUSTER_CONFIG="config-marvell-dpu-host.yaml"
                     ;;
             esac
             ;;
