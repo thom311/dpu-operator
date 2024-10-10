@@ -87,11 +87,11 @@ endif
 
 .PHONY: ipu_host
 ipu_host: prepare-e2e-test
-	./hack/cda_deploy.sh config-dpu-host.yaml
+	./hack/cda_deploy.sh dpu-host
 
 .PHONY: ipu_deploy
 ipu_deploy: prepare-e2e-test
-	./hack/cda_deploy.sh config-dpu.yaml
+	./hack/cda_deploy.sh dpu
 
 .PHONY: deploy_tft_tests
 deploy_tft_tests:
