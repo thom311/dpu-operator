@@ -82,11 +82,11 @@ prepare-e2e-test:
 
 .PHONY: ipu_host
 ipu_host: prepare-e2e-test
-	./hack/ipu_host_deploy.sh
+	./hack/cda_deploy.sh config-dpu-host.yaml
 
 .PHONY: ipu_deploy
 ipu_deploy: prepare-e2e-test
-	./hack/ipu_deploy.sh
+	./hack/cda_deploy.sh config-dpu.yaml
 
 .PHONY: deploy_tft_tests
 deploy_tft_tests:
