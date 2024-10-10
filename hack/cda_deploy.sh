@@ -11,8 +11,7 @@ test -n "$CLUSTER_CONFIG"
 CLUSTER_CONFIG_PATH="hack/cluster-configs/$CLUSTER_CONFIG"
 test -f "$CLUSTER_CONFIG_PATH"
 
-python3.11 -m venv ./.tmp/ocp-venv
-source ./.tmp/ocp-venv/bin/activate
+source ./hack/_source_python_venv.sh
 
 pushd cluster-deployment-automation
     pip install -r requirements.txt

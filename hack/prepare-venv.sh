@@ -2,10 +2,11 @@
 
 set -e
 
-rm -rf ./.tmp/ocp-venv
-python3.11 -m venv ./.tmp/ocp-venv
+dnf install python3.11 -y
 
-source ./.tmp/ocp-venv/bin/activate
+rm -rf ./.tmp/ocp-venv
+
+source ./hack/_source_python_venv.sh
 
 pushd cluster-deployment-automation
 sh ./dependencies.sh
