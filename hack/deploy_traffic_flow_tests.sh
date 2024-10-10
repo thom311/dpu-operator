@@ -2,7 +2,7 @@
 
 set -e
 
-source ./.tmp/ocp-venv/bin/activate
+source ./hack/_source_python_venv.sh
 
 cd ocp-traffic-flow-tests
 
