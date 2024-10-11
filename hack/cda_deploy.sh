@@ -17,7 +17,7 @@ source ./.tmp/ocp-venv/bin/activate
 pushd cluster-deployment-automation
     pip install -r requirements.txt
     ret=0
-    python cda.py --secret /root/pull_secret.json "../$CLUSTER_CONFIG_PATH" deploy || ret=$?
+    python cda.py -v debug --secret /root/pull_secret.json "../$CLUSTER_CONFIG_PATH" deploy || ret=$?
 popd
 
 if [ "$ret" = 0 ]; then
