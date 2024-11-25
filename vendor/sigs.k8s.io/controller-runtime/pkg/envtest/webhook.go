@@ -331,9 +331,13 @@ func createWebhooks(config *rest.Config, mutHooks []*admissionv1.MutatingWebhook
 func ensureCreated(cs client.Client, obj client.Object) error {
 	existing := obj.DeepCopyObject().(client.Object)
 	err := cs.Get(context.Background(), client.ObjectKey{Name: obj.GetName()}, existing)
+	log.V(1).Info(">>> ensureCreated1", "err", err, "obj", obj)
 	switch {
 	case apierrors.IsNotFound(err):
-		if err := cs.Create(context.Background(), obj); err != nil {
+		log.V(1).Info(">>>> Webhook create", "webhook", obj.GetName())
+		err := cs.Create(context.Background(), obj)
+		log.V(1).Info(">>>> Webhook create", "err", err)
+		if err != nil {
 			return err
 		}
 	case err != nil:

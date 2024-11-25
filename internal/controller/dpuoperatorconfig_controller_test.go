@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
+	"strconv"
 	"sync"
 	"time"
 
@@ -21,6 +23,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -145,6 +148,7 @@ func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *syn
 	go func() {
 		setupLog.Info("starting manager")
 		err := mgr.Start(ctx)
+		setupLog.Info("starting manager done", "err", err)
 		Expect(err).NotTo(HaveOccurred())
 		wg.Done()
 	}()
@@ -155,11 +159,18 @@ func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *syn
 	addrPort := fmt.Sprintf("%s:%d", webhookInstallOptions.LocalServingHost, webhookInstallOptions.LocalServingPort)
 	Eventually(func() error {
 		conn, err := tls.DialWithDialer(dialer, "tcp", addrPort, &tls.Config{InsecureSkipVerify: true})
+		setupLog.Info(">>>> dial test", "err", err)
 		if err != nil {
 			return err
 		}
 		return conn.Close()
 	}).Should(Succeed())
+
+	setupLog.Info(">>>> mgr: done")
+
+	existing := &admissionv1.ValidatingWebhookConfiguration{}
+	err = mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: "", Name: "validating-webhook-configuration"}, existing)
+	setupLog.Info(">>>> mgr: doneXXX", "err", err, "existing", existing)
 
 	return mgr
 }
@@ -237,6 +248,54 @@ var _ = Describe("Main Controller", Ordered, func() {
 				ns := dpuOperatorNameSpace()
 				cr = dpuOperatorCR(testDpuOperatorConfigName, "host", ns)
 				createNameSpace(mgr.GetClient(), ns)
+
+				dialer := &net.Dialer{Timeout: time.Second}
+				webhookInstallOptions := &testutils.TestEnv.WebhookInstallOptions
+				addrPort := fmt.Sprintf("%s:%d", webhookInstallOptions.LocalServingHost, webhookInstallOptions.LocalServingPort)
+				Eventually(func() error {
+					conn, err := tls.DialWithDialer(dialer, "tcp", addrPort, &tls.Config{InsecureSkipVerify: true})
+					setupLog.Info(">>>> dial test", "err", err)
+					if err != nil {
+						return err
+					}
+					return conn.Close()
+				}).Should(Succeed())
+
+				cmd := exec.Command("curl", "-v", "-k", "https://"+webhookInstallOptions.LocalServingHost+":"+strconv.Itoa(webhookInstallOptions.LocalServingPort)+"/validate-config-openshift-io-v1-dpuoperatorconfig?timeout=10s")
+				output, err := cmd.CombinedOutput()
+				if err != nil {
+					setupLog.Error(err, "Command failed")
+				}
+				setupLog.Info("Command output:", "output", string(output))
+
+				setupLog.Info(">>>> CERT:", "a", webhookInstallOptions.LocalServingCAData)
+
+				err = os.WriteFile("cadata.txt", webhookInstallOptions.LocalServingCAData, 0644)
+				if err != nil {
+					setupLog.Error(err, "Failed to write file")
+				}
+
+				cmd = exec.Command("curl", "-v", "--cacert", "cadata.txt", "https://"+webhookInstallOptions.LocalServingHost+":"+strconv.Itoa(webhookInstallOptions.LocalServingPort)+"/validate-config-openshift-io-v1-dpuoperatorconfig?timeout=10s")
+				output, err = cmd.CombinedOutput()
+				if err != nil {
+					setupLog.Error(err, "Command failed")
+				}
+				setupLog.Info("Command output:", "output", string(output))
+
+				setupLog.Info(">>>> certdir: " + webhookInstallOptions.LocalServingCertDir)
+				cmd = exec.Command("sh", "-c", "find "+webhookInstallOptions.LocalServingCertDir+"; ls -la "+webhookInstallOptions.LocalServingCertDir)
+				output, err = cmd.CombinedOutput()
+				if err != nil {
+					setupLog.Error(err, "Command failed")
+				}
+				setupLog.Info("Command output:", "output", string(output))
+
+				setupLog.Info(">>>> before createDpuOperatorCR()")
+
+				existing := &admissionv1.ValidatingWebhookConfiguration{}
+				err = mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: "", Name: "validating-webhook-configuration"}, existing)
+				setupLog.Info(">>>> mgr: doneXXX", "err", err, "existing", existing)
+
 				createDpuOperatorCR(mgr.GetClient(), cr)
 			})
 			It("should have DPU daemon daemonsets created by controller manager", func() {
