@@ -227,6 +227,18 @@ var _ = Describe("Main Controller", Ordered, func() {
 					return mgr.GetClient().Get(context.Background(), types.NamespacedName{Namespace: "default", Name: testNetworkFunctionNADHost}, nad)
 				}, testutils.TestAPITimeout*3, testutils.TestRetryInterval).ShouldNot(HaveOccurred())
 			})
+			It("only DpuOperatorConfig \"openshift-dpu-operator/dpu-operator-config\" is allowed", func() {
+				ns := dpuOperatorNameSpace()
+				client := mgr.GetClient()
+
+				cr2 := dpuOperatorCR("foo", "host", ns)
+				err2 := client.Create(context.Background(), cr2)
+				/* The validating webhook does not run in this setup. If it were, adding
+				 * this CR would be rejected. Instead, it passes. This indicates that the
+				 * webhook is not running. */
+				Expect(err2).NotTo(HaveOccurred())
+				deleteDpuOperatorCR(mgr.GetClient(), cr2)
+			})
 			AfterAll(func() {
 				ns := dpuOperatorNameSpace()
 				cr = dpuOperatorCR(testDpuOperatorConfigName, "host", ns)
