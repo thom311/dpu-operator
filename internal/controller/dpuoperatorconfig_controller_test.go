@@ -2,8 +2,12 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
+	"fmt"
+	"net"
 	"os"
 	"sync"
+	"time"
 
 	netattdefv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 
@@ -115,14 +119,22 @@ func deleteDpuOperatorCR(client client.Client, cr *configv1.DpuOperatorConfig) {
 func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *sync.WaitGroup) ctrl.Manager {
 	var err error
 
+	webhookInstallOptions := &testutils.TestEnv.WebhookInstallOptions
 	mgr, err := ctrl.NewManager(client, ctrl.Options{
 		Scheme: scheme.Scheme,
 		Metrics: server.Options{
 			BindAddress: ":18001",
 		},
-		WebhookServer:    webhook.NewServer(webhook.Options{Port: 9443}),
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Host:    webhookInstallOptions.LocalServingHost,
+			Port:    webhookInstallOptions.LocalServingPort,
+			CertDir: webhookInstallOptions.LocalServingCertDir,
+		}),
 		LeaderElectionID: "1e46962d.openshift.io",
 	})
+	Expect(err).NotTo(HaveOccurred())
+
+	err = (&configv1.DpuOperatorConfig{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
 	b := NewDpuOperatorConfigReconciler(mgr.GetClient(), mgr.GetScheme(), "mock-image", plugin.CreateVspImagesMap(false, setupLog))
@@ -137,6 +149,17 @@ func startDPUControllerManager(ctx context.Context, client *rest.Config, wg *syn
 		wg.Done()
 	}()
 	<-mgr.Elected()
+
+	// wait for the webhook server to get ready
+	dialer := &net.Dialer{Timeout: time.Second}
+	addrPort := fmt.Sprintf("%s:%d", webhookInstallOptions.LocalServingHost, webhookInstallOptions.LocalServingPort)
+	Eventually(func() error {
+		conn, err := tls.DialWithDialer(dialer, "tcp", addrPort, &tls.Config{InsecureSkipVerify: true})
+		if err != nil {
+			return err
+		}
+		return conn.Close()
+	}).Should(Succeed())
 
 	return mgr
 }

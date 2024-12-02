@@ -58,6 +58,9 @@ func bootstrapTestEnv(restConfig *rest.Config) {
 		ErrorIfCRDPathMissing: true,
 		UseExistingCluster:    &trueVal,
 		Config:                restConfig,
+		WebhookInstallOptions: envtest.WebhookInstallOptions{
+			Paths: []string{relativeToAbs("../../config/webhook")},
+		},
 	}
 	By("starting the test env")
 	cfg, err := TestEnv.Start()
