@@ -2,13 +2,16 @@
 
 set -e
 
-cd cluster-deployment-automation
 source /tmp/cda-venv/bin/activate
+
+CONFIG="$(./hack/detect-config-dpu.sh)"
+
+cd cluster-deployment-automation
 
 # Tear down any previous cluster fully
 ./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu-host.yaml deploy -f
 
-./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu.yaml deploy
+./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/"$CONFIG" deploy
 
 ret=$?
 if [ $ret == 0 ]; then

@@ -2,10 +2,13 @@
 
 set -e
 
-cd cluster-deployment-automation
 source /tmp/cda-venv/bin/activate
 
-./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/config-dpu.yaml deploy -s post
+CONFIG="$(./hack/detect-config-dpu.sh)"
+
+cd cluster-deployment-automation
+
+./cda.py --secret /root/pull_secret.json ../hack/cluster-configs/"$CONFIG" deploy -s post
 
 ret=$?
 if [ $ret == 0 ]; then
