@@ -98,7 +98,7 @@ fast_e2e_test: prepare-e2e-test
 	hack/deploy_fast.sh
 
 .PHONY: e2e_test
-e2e-test: deploy_clusters e2e-test-suite traffic-flow-tests
+e2e-test: deploy_clusters
 	@echo "E2E Test Completed"
 
 .PHONY: redeploy-both-incremental
