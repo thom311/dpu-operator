@@ -21,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ApplyTemplate(reader io.Reader, vars map[string]string) (io.Reader, error) {
+func ApplyTemplate(reader io.Reader, vars map[string]any) (io.Reader, error) {
 	contents, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func BinDataYamlFiles(dirPath string, binData embed.FS) ([]string, error) {
 	return yamlFileDescriptors, nil
 }
 
-func applyFromBinData(logger logr.Logger, filePath string, data map[string]string, binData embed.FS, client client.Client, cfg *configv1.DpuOperatorConfig, scheme *runtime.Scheme) error {
+func applyFromBinData(logger logr.Logger, filePath string, data map[string]any, binData embed.FS, client client.Client, cfg *configv1.DpuOperatorConfig, scheme *runtime.Scheme) error {
 	file, err := binData.Open(filepath.Join("bindata", filePath))
 	if err != nil {
 		return fmt.Errorf("Failed to read file '%s': %v", filePath, err)
@@ -82,7 +82,7 @@ func applyFromBinData(logger logr.Logger, filePath string, data map[string]strin
 	return nil
 }
 
-func ApplyAllFromBinData(logger logr.Logger, binDataPath string, data map[string]string, binData embed.FS, client client.Client, cfg *configv1.DpuOperatorConfig, scheme *runtime.Scheme) error {
+func ApplyAllFromBinData(logger logr.Logger, binDataPath string, data map[string]any, binData embed.FS, client client.Client, cfg *configv1.DpuOperatorConfig, scheme *runtime.Scheme) error {
 	filePaths, err := BinDataYamlFiles(binDataPath, binData)
 	if err != nil {
 		return err

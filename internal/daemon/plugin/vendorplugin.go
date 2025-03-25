@@ -111,8 +111,8 @@ type VspTemplateVars struct {
 	WithMemory                string
 }
 
-func (v VspTemplateVars) ToMap() map[string]string {
-	return map[string]string{
+func (v VspTemplateVars) ToMap() map[string]any {
+	return map[string]any{
 		"VendorSpecificPluginImage": v.VendorSpecificPluginImage,
 		"Namespace":                 v.Namespace,
 		"ImagePullPolicy":           v.ImagePullPolicy,
