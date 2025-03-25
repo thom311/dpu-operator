@@ -127,9 +127,9 @@ func (r *DpuOperatorConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	return ctrl.Result{}, nil
 }
 
-func (r *DpuOperatorConfigReconciler) createCommonData(cfg *configv1.DpuOperatorConfig) map[string]string {
+func (r *DpuOperatorConfigReconciler) createCommonData(cfg *configv1.DpuOperatorConfig) map[string]any {
 	// All the CRs will be in the same namespace as the operator config
-	data := map[string]string{
+	data := map[string]any{
 		"Namespace":              vars.Namespace,
 		"ImagePullPolicy":        r.imagePullPolicy,
 		"Mode":                   "auto",
