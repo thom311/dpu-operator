@@ -26,6 +26,13 @@ spec:
           runAsUser: 0
         command: {{.Command}}
         args: {{.Args}}
+        resources:
+          requests:
+            memory: 256Mi
+            hugepages-32Mi: 256Mi
+          limits:
+            memory: 256Mi
+            hugepages-32Mi: 256Mi
         volumeMounts:
         - mountPath: /host
           mountPropagation: Bidirectional
@@ -38,6 +45,12 @@ spec:
         - mountPath: /proc
           mountPropagation: Bidirectional
           name: host-proc
+        - mountPath: /lib/modules/
+          mountPropagation: HostToContainer
+          name: host-libmodules
+        - mountPath: /dev/
+          mountPropagation: Bidirectional
+          name: host-dev
       dnsPolicy: ClusterFirstWithHostNet
       volumes:
       - hostPath:
@@ -60,3 +73,7 @@ spec:
           path: /
           type: ""
         name: host-root
+      - hostPath:
+          path: /dev/
+          type: ""
+        name: host-dev
