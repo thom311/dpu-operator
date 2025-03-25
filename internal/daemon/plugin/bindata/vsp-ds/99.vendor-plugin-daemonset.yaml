@@ -27,13 +27,13 @@ spec:
         command: {{.Command}}
         args: {{.Args}}
         resources:
-          {{- if .WithHugepages }}
+          {{- if .WithHugePages }}
           requests:
-            memory: {{.WithMemory}}
-            {{.WithHugepages}}: {{.WithMemory}}
+            memory: 256Mi
+            hugepages-32Mi: 256Mi
           limits:
-            memory: {{.WithMemory}}
-            {{.WithHugepages}}: {{.WithMemory}}
+            memory: 256Mi
+            hugepages-32Mi: 256Mi
           {{- end }}
         volumeMounts:
         - mountPath: /host

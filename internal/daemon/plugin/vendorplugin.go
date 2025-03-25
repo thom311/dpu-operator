@@ -96,8 +96,7 @@ func NewVspTemplateVars() VspTemplateVars {
 		ImagePullPolicy:           "Always",
 		Command:                   "[ ]",
 		Args:                      "[ ]",
-		WithHugepages:             "0",
-		WithMemory:                "0",
+		WithHugePages:             false,
 	}
 }
 
@@ -107,8 +106,7 @@ type VspTemplateVars struct {
 	ImagePullPolicy           string
 	Command                   string
 	Args                      string
-	WithHugepages             string
-	WithMemory                string
+	WithHugePages             bool
 }
 
 func (v VspTemplateVars) ToMap() map[string]any {
@@ -118,8 +116,7 @@ func (v VspTemplateVars) ToMap() map[string]any {
 		"ImagePullPolicy":           v.ImagePullPolicy,
 		"Command":                   v.Command,
 		"Args":                      v.Args,
-		"WithHugepages":             v.WithHugepages,
-		"WithMemory":                v.WithMemory,
+		"WithHugePages":             v.WithHugePages,
 	}
 }
 
