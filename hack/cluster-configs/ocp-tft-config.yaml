@@ -4,19 +4,22 @@ tft:
     # test cases can be specified individually i.e "1,2,3,6" or as a range i.e. "1-9,15-19"
     test_cases: "1"
     duration: "30"
+    privileged_pod: true
     # Location of artifacts from run can be specified: default <working-dir>/ft-logs/
     # logs: "/tmp/ft-logs"
     connections:
       - name: "Connection_1"
         # supported types: iperf-tcp, iperf-udp, netperf-tcp-stream, netperf-tcp-rr
-        type: "iperf-udp"
+        type: "simple"
         instances: 1
         server:
           - name: "$worker"
             sriov: "true"
+            args: "--num-clients 0 --exec https://file.corp.redhat.com/~thaller/simple-exec.sh --exec-insecure -E https://file.corp.redhat.com/~thaller/simple-tcp-server-client.py"
         client:
           - name: "$worker"
             sriov: "true"
+            args: "--exec https://file.corp.redhat.com/~thaller/simple-exec.sh --exec-insecure -E https://file.corp.redhat.com/~thaller/simple-tcp-server-client.py"
         secondary_network_nad: "default-sriov-net"
 kubeconfig: "/root/kubeconfig.ocpcluster"
 kubeconfig_infra: "/root/kubeconfig.microshift"
