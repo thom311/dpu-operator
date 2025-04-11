@@ -18,3 +18,5 @@ spec:
     command: {{ command }}
     args: {{ args }}
     imagePullPolicy: {{ image_pull_policy }}
+    securityContext:
+      privileged: {{ privileged_pod }}
