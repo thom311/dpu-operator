@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	ovsDbPath  = "/var/run/openvswitch/db.sock"
-	ovsCliPath = "/usr/local/bin/ovs-vsctl"
-	deviceId   = "a063"
+	ovsDbPath      = "/var/run/openvswitch/db.sock"
+	ovsCliPath     = "/usr/local/bin/ovs-vsctl"
+	deviceId       = "a063"
+	useLinuxBridge = true
 )
 
 type OvsDP struct {
@@ -42,34 +43,63 @@ func (ovsdp *OvsDP) AddPortToDataPlane(bridgeName string, portName string, vfPCI
 
 	exec.Command("ip", "link", "set", portName, "up").Run()
 
-	if isDPDK {
+	if useLinuxBridge {
+		ovsdp.log.Info("Adding Port to Linux Bridge", "BridgeName", bridgeName, "PortName", portName)
+		cmd = exec.Command("bash", "-c",
+			"ip link set \"$1\" master \"$2\"",
+			"bash", portName, bridgeName)
+	} else if isDPDK {
 		ovsdp.log.Info("Adding DPDK Port to Bridge", "PortName", portName, "VFPCIAddress", vfPCIAddres)
 		cmd = exec.Command("chroot", "/host", "ovs-vsctl", "--may-exist", "add-port", bridgeName, portName, "--", "set", "Interface", portName, "type=dpdk", fmt.Sprintf("options:dpdk-devargs=%s", vfPCIAddres))
-
 	} else {
 		ovsdp.log.Info("Adding Port to Bridge", "PortName", portName)
 		cmd = exec.Command("chroot", "/host", "ovs-vsctl", "--may-exist", "add-port", bridgeName, portName)
-
 	}
 	return cmd.Run()
 }
 
 // ovs-vsctl command to delete dpdk-port from bridge
 func (ovsdp *OvsDP) DeletePortFromDataPlane(bridgeName string, portName string) error {
+	var cmd *exec.Cmd
+
 	ovsdp.log.Info("Deleting Port from Bridge", "PortName", portName)
-	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "del-port", bridgeName, portName)
+	if useLinuxBridge {
+		cmd = exec.Command("bash", "-c",
+			"ip link set \"$1\" nomaster",
+			"bash", portName)
+	} else {
+		cmd = exec.Command("chroot", "/host", "ovs-vsctl", "del-port", bridgeName, portName)
+	}
 	return cmd.Run()
 }
 
 // ovs-vsctl command to delete ovs bridge
 func (ovsdp *OvsDP) DeleteDataplane(bridgeName string) error {
-	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "del-br", bridgeName)
+	var cmd *exec.Cmd
+
+	if useLinuxBridge {
+		cmd = exec.Command("bash", "-c",
+			"! [ -e \"/sys/class/net/$1\" ] || ip link del \"$1\"",
+			"bash", bridgeName)
+	} else {
+		cmd = exec.Command("chroot", "/host", "ovs-vsctl", "del-br", bridgeName)
+	}
 	return cmd.Run()
 }
 
 // ovs-vsctl command to create bridge
 func createBridge(bridgeName string) error {
-	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "--may-exist", "add-br", bridgeName, "--", "set", "bridge", bridgeName, "datapath_type=netdev")
+	var cmd *exec.Cmd
+
+	if useLinuxBridge {
+		cmd = exec.Command("bash", "-c",
+			"( ! [ -e \"/sys/class/net/$1\" ] || ip link del \"$1\" ) && "+
+				"ip link add name \"$1\" type bridge "+
+				"ip link set \"$1\" up",
+			"bash", bridgeName)
+	} else {
+		cmd = exec.Command("chroot", "/host", "ovs-vsctl", "--may-exist", "add-br", bridgeName, "--", "set", "bridge", bridgeName, "datapath_type=netdev")
+	}
 	return cmd.Run()
 }
 
@@ -100,7 +130,15 @@ func (ovsdp *OvsDP) InitDataPlane(bridgeName string) error {
 
 // ReadPortFromBridge reads all the ports from the bridge
 func (ovsdp *OvsDP) ReadAllPortFromDataPlane(bridgeName string) (string, error) {
-	cmd := exec.Command("chroot", "/host", "ovs-vsctl", "--may-exist", "list-ports", bridgeName)
+	var cmd *exec.Cmd
+
+	if useLinuxBridge {
+		cmd = exec.Command("bash", "-c",
+			"link show master \"$1\" | sed -n 's/^[0-9]\\+: \\([^@:]\\+\\).*/\\1/p'",
+			"bash", bridgeName)
+	} else {
+		cmd = exec.Command("chroot", "/host", "ovs-vsctl", "--may-exist", "list-ports", bridgeName)
+	}
 	out, err := cmd.Output()
 	if err != nil {
 		ovsdp.log.Error(err, "Error occurred in reading ports from Bridge")
