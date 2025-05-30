@@ -694,12 +694,24 @@ func (vsp *mrvlVspServer) configureIP(dpuMode bool) (pb.IpPort, error) {
 // enableIPV6LinkLocal function to enable the IPv6 Link Local Address on the given Interface Name
 // It will return the error
 func enableIPV6LinkLocal(interfaceName string, ipv6Addr string) error {
+	// For now, kernel requires that the SDP interface are up at all times. We must never
+	// set them down (RHEL-90248).
+	//
+	// - no `nmcli device set managed no`, we require that the system is already configured
+	//   with NetworkManager to not manage the interface.
+	// - no `ip link set down` when toggling the addrgenmode. We rely on the system to
+	//   already have addrgenmode eui64 set.
+	const canSetDown bool = false
+	var err1 error
+
 	// Tell NetworkManager to not manage our interface.
-	err1 := exec.Command("nsenter", "-t", "1", "-m", "-u", "-n", "-i", "--", "nmcli", "device", "set", interfaceName, "managed", "no").Run()
-	if err1 != nil {
-		// This error may be fine. Maybe our host doesn't even run
-		// NetworkManager. Ignore.
-		klog.Infof("nmcli device set %s managed no failed with error %v", interfaceName, err1)
+	if canSetDown {
+		err1 = exec.Command("nsenter", "-t", "1", "-m", "-u", "-n", "-i", "--", "nmcli", "device", "set", interfaceName, "managed", "no").Run()
+		if err1 != nil {
+			// This error may be fine. Maybe our host doesn't even run
+			// NetworkManager. Ignore.
+			klog.Infof("nmcli device set %s managed no failed with error %v", interfaceName, err1)
+		}
 	}
 
 	optimistic_dad_file := "/proc/sys/net/ipv6/conf/" + interfaceName + "/optimistic_dad"
@@ -711,7 +723,9 @@ func enableIPV6LinkLocal(interfaceName string, ipv6Addr string) error {
 	// Ensure to set addrgenmode and toggle link state (which can result in creating
 	// the IPv6 link local address. Ignore errors here.
 	exec.Command("ip", "link", "set", interfaceName, "addrgenmode", "eui64").Run()
-	exec.Command("ip", "link", "set", interfaceName, "down").Run()
+	if canSetDown {
+		exec.Command("ip", "link", "set", interfaceName, "down").Run()
+	}
 
 	err := exec.Command("ip", "link", "set", interfaceName, "up").Run()
 	if err != nil {
