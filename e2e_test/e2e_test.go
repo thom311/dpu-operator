@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"testing"
 	"time"
 
@@ -94,7 +95,20 @@ func setupExternalClient(externalClientIp, externalClientDev, workloadSubnet str
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(g.Fail)
 
+	retries := 3
+	if r := os.Getenv("TEST_RETRIES"); r != "" {
+		if parsed, err := strconv.Atoi(r); err == nil && parsed >= 0 {
+			retries = parsed
+		}
+	}
+
 	g.RunSpecs(t, "e2e tests")
+	firstRunFailed := t.Failed()
+
+	for i := 2; i <= retries && firstRunFailed; i++ {
+		fmt.Printf("Test run %d/%d (retry for diagnostic purposes)\n", i, retries)
+		g.RunSpecs(t, "e2e tests")
+	}
 }
 
 var _ = g.BeforeSuite(func() {
