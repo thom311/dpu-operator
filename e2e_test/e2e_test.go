@@ -104,6 +104,7 @@ func TestControllers(t *testing.T) {
 
 	g.RunSpecs(t, "e2e tests")
 	firstRunFailed := t.Failed()
+	firstRunFailed = true
 
 	for i := 2; i <= retries && firstRunFailed; i++ {
 		fmt.Printf("Test run %d/%d (retry for diagnostic purposes)\n", i, retries)
