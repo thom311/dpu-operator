@@ -1,3 +1,20 @@
+<!-- ANN[th]: Article: https://access.redhat.com/articles/7120276 -->
+<!-- ANN[th]: Jira-Issue: https://issues.redhat.com/browse/IIC-887 -->
+<!-- ANN[th]: Jira-Issue: https://issues.redhat.com/browse/TELCODOCS-2504 -->
+<!-- ANN[th]: Errata v1: https://docs.google.com/document/d/1XEXeKxFQ_Lvqz9PLUoucU7zCUZohpcyBbBdoXvTkMLA/edit?tab=t.0 -->
+<!-- ANN[th]: Notes about installing OPILab: https://docs.google.com/document/d/140XMmFQKQorSDLL0IEmtWUDpMNYoF1RECNC8izBKru0/edit?tab=t.0 -->
+
+<!-- ANN[th]: Note: in https://access.redhat.com/articles/7120276, section headings are -->
+<!-- ANN[th]:       not linkable (no anchors). Although, there is an index on top. -->
+
+<!-- ANN[th]: Note: The code blocks have a “Raw” link. When you click on them, a -->
+<!-- ANN[th]:       new window opens and the text looks raw (good). However, this is not plain -->
+<!-- ANN[th]:       text document. If you look at the source of that file, it is HTML. Also, if you click -->
+<!-- ANN[th]:       “Save Page As…”, the resulting file is not a usable plain text script. -->
+
+<!-- ANN[th]: Note: there are various pointers to Intel IPU documentation. Would be good to -->
+<!-- ANN[th]:       have links. -->
+
 ## **Introduction**
 
 This knowledge base details the steps required to deploy a full end-to-end solution with Intel's Infrastructure Processing Unit (Intel®
@@ -13,7 +30,7 @@ IPU E2100 Series) integrated into Red Hat OpenShift, the industry-leading hybrid
 
 -   **Solution Overview:** This knowledge base walks through deploying the F5 NGINX on the IPU. This NGINX instance functions as a reverse proxy, providing access to ResNet application virtual machines (VMs) running on the OpenShift worker nodes.
 
-**Prerequisites**
+## **Prerequisites**
 
 Before proceeding, ensure the following prerequisites are met:
 
@@ -42,8 +59,13 @@ Before proceeding, ensure the following prerequisites are met:
 
     -   All components should have internet access for pulling images and packages.
 
-**Solution architecture and network topology**
+## **Solution architecture and network topology**
 [image=[src="images/ipu-dp-ocp-arch_2.png", alt="DPU OpenShift architecture", size="LG - Large", data-cp-size="100%",  ]]
+
+<!-- ANN[th]: Regarding Image^^: -->
+<!-- ANN[th]:   - The “VM Workload” term seems not accurate. These are plain containers. -->
+<!-- ANN[th]:   - The secondary network interfaces in nginx pod should be called “net1” and “net2” (not “net0” and “net1”) -->
+<!-- ANN[th]:   - What is “Normal Container”? -->
 
 The deployment involves three networks:
 
@@ -60,7 +82,12 @@ This section outlines building a RHEL ISO with MicroShift and deploying it to th
 
 ####1. **Create RHEL for edge image with kickstart:**
 
-Follow the guidance in [Creating the RHEL for Edge image](https://docs.redhat.com/en/documentation/red_hat_build_of_microshift/4.15/html/installing/microshift-embed-in-rpm-ostree#microshift-creating-ostree-iso_microshift-embed-in-rpm-ostree) to create a kickstart file.
+Start with a Red Hat Enterprise Linux installation ISO. Booting the plain ISO
+requires manual steps during installation. Instead, you can build a custom ISO
+that includes a kickstart file to automate the installation and preconfigure
+the IPU.
+
+A better alternative is to [create a RHEL for Edge image](https://docs.redhat.com/en/documentation/red_hat_build_of_microshift/4.19/html/embedding_in_a_rhel_for_edge_image/index). This produces an immutable operating system with MicroShift already bundled.
 
 > **Important kickstart configuration**
 >  Include the following in your kickstart file to enable iSCSI boot for the IPU's Arm Compute Complex (ACC). The 192.168.0.0/24 network is internal to the IPU and should not be used elsewhere.
@@ -75,7 +102,13 @@ Use Redfish virtual media to boot the newly created RHEL for Edge ISO on the IPU
 
 ####3. **Install and Configure MicroShift:**
 
-Once RHEL is installed on the IPU, follow the guidance in the [Red Hat build of MicroShift documentation](https://docs.redhat.com/en/documentation/red_hat_build_of_microshift/latest/html/installing_with_an_rpm_package/index) to install MicroShift and any additional required packages.
+If your installation ISO does not include MicroShift, you will need to install
+it manually. Once RHEL is installed on the IPU, follow the
+[Red Hat build of MicroShift documentation](https://docs.redhat.com/en/documentation/red_hat_build_of_microshift/latest/html/installing_with_an_rpm_package/index)
+to install MicroShift and any additional required packages.
+
+To enable the Operator Lifecycle Manager (OLM), also install the
+`microshift-olm` package.
 
 ####4. **Copy P4 artifacts to the DPU (IPU):** 
 
@@ -104,14 +137,15 @@ The P4 program defines the packet processing pipeline on the IPU. Obtain the nec
 
 ####5. **Enable `systemd` daemon to create `hugepages` configuration on the ACC:**
 
-Run the following command enable `systemd` daemon and create `hugepages` configuration on the ACC:
+Run the following commands to enable a `systemd` service that sets up `hugepages` on the ACC:
 
 ```
-cat << EOF > /etc/systemd/system/hugepages-setup.service
+cat <<EOF > /etc/systemd/system/hugepages-setup.service
+[Unit]
 Description=Setup Hugepages
+Before=sysinit.target
 Before=microshift.service
-Wants=microshift.service
-   
+
 [Service]
 Type=oneshot
 RemainAfterExit=yes
@@ -120,13 +154,18 @@ ExecStart=/bin/mount -t hugetlbfs -o pagesize=2M none /dev/hugepages
 ExecStart=/bin/sh -c 'echo 512 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages'
 
 [Install]
-WantedBy=multi-user.target"""
+WantedBy=microshift.service
 EOF
-sudo systemctl daemon-reload
-sudo systemctl enable hugepages-setup.service
-sudo systemctl start hugepages-setup.service
+
+systemctl daemon-reload
+systemctl enable --now hugepages-setup.service
 systemctl restart microshift
 ```
+
+You can also build the installation ISO to include this systemd service.
+
+Alternatively, you can configure your kickstart file to add the following
+kernel parameters: `default_hugepagesz=2M hugepagesz=2M hugepages=512`.
 
 ####6. **Reload IDPF driver on Host:**
 
@@ -143,7 +182,34 @@ Ensure you have a fully operational OpenShift cluster. For installation guidance
 
 ### **Install the DPU Operator on your OpenShift cluster** 
 
-Install the DPU Operator on your OpenShift cluster. The DPU Operator manages the DPU-specific configurations and life cycle of services on the IPU. Follow the [OpenShift DPU Operator documentation](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/networking/networking-operators#dpu-operator) for installation instructions. 
+The DPU Operator manages DPU-specific configurations and the service lifecycle
+on the IPU, so you don’t have to handle them manually.
+
+The most common way is via OperatorHub in the OpenShift web console, but
+you can also install it via the CLI or YAML manifests if you prefer a more
+automated approach. See the
+[OpenShift DPU Operator documentation](https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/networking_operators/dpu-operator#installing-dpu-operator).
+
+Then follow the steps to [Configure the DPU Operator](https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/networking_operators/dpu-operator#configuring-dpu-operator).
+
+> **Note**
+> At the time of writing, the OperatorHub version may have issues. Be prepared to use workarounds or install from manifest if needed.
+
+### **Install DPU Operator in Microshift on the IPU**
+
+On Microshift, the process is similar but without a console Web UI.
+You'll use the Operator Lifecycle Manager (OLM). Ensure the `microshift-olm`
+package is installed, then follow the
+[OLM Documentation](https://docs.redhat.com/en/documentation/red_hat_build_of_microshift/4.19/html/running_applications/operators#microshift-operators-olm).
+
+You will need to create a `CatalogSource`. Inspect what is configured on the
+OCP cluster:
+```bash
+oc get -n openshift-marketplace catalogsource/redhat-operators -o yaml
+```
+and create a corresponding `CatalogSource` in Microshift on the IPU.
+
+The further steps are the same as installing the DPU operator on the Openshift cluster.
 
 ###  **Deploy F5 NGINX on the IPU**
 
@@ -192,7 +258,7 @@ spec:
   securityContext:
     runAsUser: 0
   nodeSelector:
-    kubernetes.io/hostname: worker-238
+    kubernetes.io/hostname: worker-hostname
   volumes:
     - name: model-volume
       emptyDir: {}
@@ -235,9 +301,10 @@ spec:
         limits:
           openshift.io/dpu: '1'
 ```
-Key points in the manifest: 
 
-* `.spec.template.spec.networks` and `.spec.template.spec.domain.devices.interfaces`define network attachments. The `blue-network` connects to the `default-sriov-net`.
+Adjust the `kubernetes.io/hostname` selector for your cluster.
+
+The `k8s.v1.cni.cncf.io/networks: default-sriov-net` annotation configures a secondary network using the network attachment definition created by the DPU operator.
 
 2. Apply the manifest by running the following command:
 
@@ -245,10 +312,21 @@ Key points in the manifest:
 oc apply -f your-manifest.yaml -n <namespace>
 ```
 
-3. Repeat the steps above for each ResNet pod you need to deploy. Note their IP addresses on the Blue Network once they are running. 
+3. Repeat the steps above for each ResNet pod you need to deploy.
+
+4. Note their IP addresses on the Blue Network once they are running. For example run `oc -n default exec -ti pod/resnet50-model-server-1 -- hostname -I`. or via
+   `oc -n default get pod "resnet50-model-server-1" -o jsonpath='{.metadata.annotations.k8s\.v1\.cni\.cncf\.io/network-status}' | jq -r '.[] | select(.interface=="net1") | .ips[0]'`
 
 ### **Configure NGINX as a reverse proxy**
+
 The NGINX instance running on the IPU (deployed using `ServiceFunctionChain`) needs to be configured to act as a reverse proxy, forwarding requests to the ResNet pods on the Blue Network.
+
+For production use the NGINX service needs to be configured automatically. For example, by building a specific NGINX container image with the base configuration. There
+also needs to be a way to automatically configure the IP addresses of the upstream pods. In the future, DPU Operator's `ServiceFunctionChain` may support features
+to help with that like a `ConfigMap` for the network function pod.
+
+In our example, we take the upstream `nginx` container from the Docker Container Registry. We thus need to configure the pod after it started. We
+can do sy by accessing the NGINX pod with `oc -n openshift-dpu-operator exec -ti pod/nginx -- bash`.
 
 This configuration typically involves:
 
@@ -261,13 +339,11 @@ This configuration typically involves:
     * `location` blocks with `proxy_pass` directives pointing to the upstream.
 
 ```
- http {
+http {
     server {
-        listen      172.16.3.200:443 ssl http2;
-        server_name grpc.example.com;
+        listen      *:443 ssl http2;
 
-        #ssl_certificate     /path/to/fullchain.pem;
-        #ssl_certificate_key /path/to/privkey.pem;
+        server_name demo.example.com;
         ssl_certificate /etc/nginx/server.crt;
         ssl_certificate_key /etc/nginx/server.key;
 
@@ -289,7 +365,6 @@ This configuration typically involves:
         server 10.56.217.2:9000;
         server 10.56.217.3:9000;
         server 10.56.217.4:9000;
-        # you can also add `keepalive` here
     }
 }
 
@@ -298,32 +373,34 @@ events {
 }
 ```
 
-### **Applying the NGINX Configuration**
-The method for applying this configuration depends on the NGINX image and the `ServiceFunctionChain` capabilities: 
+3. Configure TLS certificate by providing the files `/etc/nginx/server.{crt,key}` to the pod.
 
-* **Pre-configured Image:** The `<F5_NGINX_DPU_IMAGE_URL>` might already contain a default configuration or expect environment variables for backend IPs.
-* **ConfigMap:** If the `ServiceFunctionChain` CRD on MicroShift supports mounting `ConfigMaps`, you would create a `ConfigMap` containing your `nginx.conf` and reference it in the `ServiceFunctionChain` manifest. This is a common pattern in Kubernetes.
+4. Configure IP addresses for the external endpoint and to reach the ResNet pods. The former
+   is the IP address which client applications will access. The latter is in the `10.56.217.0/24`
+   subnet to communicate with the pods.
 
-Consult the documentation for your specific F5 NGINX DPU image and the `ServiceFunctionChain` implementation on the IPU for the correct method. 
+5. Reload nginx inside the pod `nginx -s reload`.
 
 ### **Accessing the Service and Performing Inference**
 
 Once NGINX is deployed on the IPU and configured to proxy requests to the ResNet VMs:
 
-1. **Identify NGINX Access Point:** Determine the IP address and port on which NGINX is listening on the IPU's Blue Network interface. This is the entry point for your client traffic.
+1. **Identify NGINX Access Point:** Determine the IP address and port on which NGINX is listening on the IPU's Blue Network interface. This is the entry point for your client traffic that we configured in the pervious step.
 2. **Client Access:**
-    * Clients (for example test scripts, applications) that need to perform inference send their requests to `http://<NGINX_IPU_BLUE_NETWORK_IP>:<PORT>`.
+    * Clients (for example test scripts, applications) that need to perform inference send their requests to `https://` on the NGINX entry point.
     * These clients must have network reachability to the IPU's NGINX IP on the Blue Network. This might involve:
         * Clients running as pods within the OpenShift cluster, also attached to the Blue Network.
         * Clients external to the cluster, with appropriate routing configured to reach the Blue Network.
 3. **Verification:**
-    * Send a test request (for example, `curl http://<NGINX_IPU_BLUE_NETWORK_IP>:<PORT>/your-resnet-endpoint`).
+    * Send a test request.
     * Verify that the request is routed through NGINX on the IPU to one of the ResNet pods, and you receive the expected response.
     * Monitor NGINX logs on the IPU and application logs on the pods for troubleshooting.
 
+See also the [OPI Lab Demo](https://github.com/opiproject/opi-poc/tree/main/demos/Secure-AI-inferencing-NGINX-IPU/demo) which implements a similar setup.
+
 ### **Conclusion**
 
-By following this knowledge base, you have successfully 
+By following this knowledge base, you have successfully
 
 1. Deployed the DPU Operator on OpenShift.
 
