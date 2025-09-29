@@ -19,7 +19,6 @@ import (
 	ovsdp "github.com/openshift/dpu-operator/internal/daemon/vendor-specific-plugins/marvell/ovs-dp"
 	"github.com/openshift/dpu-operator/internal/utils"
 	opi "github.com/opiproject/opi-api/network/evpn-gw/v1alpha1/gen/go"
-	"github.com/safchain/ethtool"
 	"github.com/spf13/afero"
 	"github.com/vishvananda/netlink"
 	"go.uber.org/zap/zapcore"
@@ -102,6 +101,29 @@ type mrvlVspServer struct {
 	isNF          bool
 }
 
+func ethtool_disable_offload(ifname string) {
+	output1, err1 := exec.Command("ethtool", "-k", ifname).CombinedOutput()
+	if err1 != nil {
+		klog.Infof("ethtool[%s]: failed: %v", ifname, err1)
+	} else {
+		klog.Infof("ethtool[%s]: got:\n%s", ifname, string(output1))
+	}
+
+	cmd := exec.Command("ethtool", "-K", ifname, "tx", "off", "rx", "off")
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		klog.Infof("ethtool for %s failed: %v", ifname, err)
+		/* Let's ignore the error here. Not surt it will do any good to propagate it to the caller. */
+	}
+
+	output1, err1 = exec.Command("ethtool", "-k", ifname).CombinedOutput()
+	if err1 != nil {
+		klog.Infof("ethtool[%s]: failed: %v", ifname, err1)
+	} else {
+		klog.Infof("ethtool[%s]: got:\n%s", ifname, string(output1))
+	}
+}
+
 // createVethPair function to create a veth pair with the given index and InterfaceInfo
 func (vsp *mrvlVspServer) createVethPair(index int) error {
 	//secInterfaceName is the name of the interface on the Network Function side
@@ -117,12 +139,6 @@ func (vsp *mrvlVspServer) createVethPair(index int) error {
 	if nfLink != nil {
 		peerLink, _ = netlink.LinkByName(dpInterfaceName)
 	}
-
-	eth_handle, err := ethtool.NewEthtool()
-	if err != nil {
-		return err
-	}
-	defer eth_handle.Close()
 
 	if nfLink == nil || peerLink == nil {
 		vethLink := &netlink.Veth{
@@ -151,20 +167,8 @@ func (vsp *mrvlVspServer) createVethPair(index int) error {
 		 *
 		 * Also enable "rx" offloading, although, that may not be required (but is
 		 * probably harmless anyway). */
-		err = eth_handle.Change(secInterfaceName, map[string]bool{
-			"tx": false,
-			"rx": false,
-		})
-		if err != nil {
-			return err
-		}
-		err = eth_handle.Change(dpInterfaceName, map[string]bool{
-			"tx": false,
-			"rx": false,
-		})
-		if err != nil {
-			return err
-		}
+		ethtool_disable_offload(secInterfaceName)
+		ethtool_disable_offload(dpInterfaceName)
 	}
 
 	if err := netlink.LinkSetUp(nfLink); err != nil {
